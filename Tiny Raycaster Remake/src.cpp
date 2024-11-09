@@ -4,8 +4,83 @@
 #include <cstdint>
 #include <cassert>
 #include <cmath>
+#include <SDL.h>
+#include <algorithm>
 
 #define PI 3.14159265358979323846
+
+SDL_Window* window = NULL;
+const size_t win_w = 1024;
+const size_t win_h = 512;
+
+SDL_Renderer* renderer = NULL;
+bool running = false;
+
+//uint32_t* framebuffer = NULL;
+std::vector<uint32_t> framebuffer(win_w* win_h, 0xFFFFFFFF);
+SDL_Texture* screen_texture = NULL;
+
+bool init_window()
+{
+	if (SDL_Init(SDL_INIT_EVERYTHING) != 0)
+	{
+		fprintf(stderr, "Error initializing SDL\n");
+		return false;
+	}
+
+	window = SDL_CreateWindow(NULL, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, win_w, win_h, NULL);
+
+	if (!window)
+	{
+		fprintf(stderr, "Error creating window\n");
+		return false;
+	}
+
+	renderer = SDL_CreateRenderer(window, -1, NULL);
+
+	if (!renderer)
+	{
+		fprintf(stderr, "Error creating renderer\n");
+		return false;
+	}
+
+	screen_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, win_w, win_h);
+
+	return true;
+}
+
+void input()
+{
+	SDL_Event event;
+	SDL_PollEvent(&event);
+
+	switch (event.type)
+	{
+	case SDL_QUIT:
+		running = false;
+		break;
+	case SDL_KEYDOWN:
+		if (event.key.keysym.sym == SDLK_ESCAPE)
+		{
+			running = false;
+		}
+		break;
+	}
+}
+
+void render()
+{
+	SDL_UpdateTexture(screen_texture, NULL, &framebuffer[0], (int)(win_w * sizeof(uint32_t)));
+	SDL_RenderCopy(renderer, screen_texture, NULL, NULL);
+	SDL_RenderPresent(renderer);
+}
+
+void destroy()
+{
+	SDL_DestroyRenderer(renderer);
+	SDL_DestroyWindow(window);
+	SDL_Quit();
+}
 
 uint32_t pack_color(const uint8_t r, const uint8_t g, const uint8_t b, const uint32_t a = 255)
 {
@@ -55,12 +130,9 @@ void draw_rectangle(std::vector<uint32_t>& img, const size_t img_w, const size_t
 	}
 }
 
-int main()
+int main(int argc, char* argv[])
 {
-	const size_t win_w = 1024;
-	const size_t win_h = 512;
-
-	std::vector<uint32_t> framebuffer(win_w * win_h, pack_color(255, 255, 255));
+	running = init_window();
 
 	const size_t map_w = 16;
 	const size_t map_h = 16;
@@ -93,46 +165,57 @@ int main()
 	const size_t rect_w = win_w / (map_w * 2);
 	const size_t rect_h = win_h / map_h;
 
-	for (size_t j = 0; j < map_h; j++)
+	
+
+	while(running)
 	{
-		for (size_t i = 0; i < map_w; i++)
+		input();
+
+		for (size_t j = 0; j < map_h; j++)
 		{
-			if (map[i + j * map_w] == ' ') 
+			for (size_t i = 0; i < map_w; i++)
 			{
-				continue;
-			}
+				if (map[i + j * map_w] == ' ')
+				{
+					continue;
+				}
 
-			size_t rect_x = i * rect_w;
-			size_t rect_y = j * rect_h;
+				size_t rect_x = i * rect_w;
+				size_t rect_y = j * rect_h;
 
-			draw_rectangle(framebuffer, win_w, win_h, rect_x, rect_y, rect_w, rect_h, pack_color(0, 255, 255));
-		}
-	}
-
-	for (size_t i = 0; i < win_w / 2; i++)
-	{
-		float angle = player_a - fov / 2 + fov * i / float(win_w / 2);
-
-		for (float t = 0; t < 20; t += 0.05)
-		{
-			float cx = player_x + t * cos(angle);
-			float cy = player_y + t * sin(angle);
-
-			size_t pix_x = cx * rect_w;
-			size_t pix_y = cy * rect_h;
-
-			framebuffer[pix_x + pix_y * win_w] = pack_color(160, 160, 160);
-
-			if (map[int(cx) + int(cy) * map_w] != ' ')
-			{
-				size_t column_height = win_h / t;
-				draw_rectangle(framebuffer, win_w, win_h, win_w / 2 + i, win_h / 2 - column_height / 2, 1, column_height, pack_color(0, 255, 255));
-				break;
+				draw_rectangle(framebuffer, win_w, win_h, rect_x, rect_y, rect_w, rect_h, pack_color(100, 100, 100));
 			}
 		}
+
+		for (size_t i = 0; i < win_w / 2; i++)
+		{
+			float angle = player_a - fov / 2 + fov * i / float(win_w / 2);
+
+			for (float t = 0; t < 20; t += 0.05)
+			{
+				float cx = player_x + t * cos(angle);
+				float cy = player_y + t * sin(angle);
+
+				size_t pix_x = cx * rect_w;
+				size_t pix_y = cy * rect_h;
+
+				framebuffer[pix_x + pix_y * win_w] = pack_color(160, 160, 160);
+
+				if (map[int(cx) + int(cy) * map_w] != ' ')
+				{
+					size_t column_height = win_h / t;
+					draw_rectangle(framebuffer, win_w, win_h, win_w / 2 + i, win_h / 2 - column_height / 2, 1, column_height, pack_color(100, 100, 100));
+					break;
+				}
+			}
+		}
+
+		render();
 	}
 
-	drop_ppm_image("./out.ppm", framebuffer, win_w, win_h);
+	//drop_ppm_image("./out.ppm", framebuffer, win_w, win_h);
+
+	destroy();
 
 	return 0;
 }
