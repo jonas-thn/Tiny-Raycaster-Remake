@@ -5,7 +5,6 @@
 #include <cassert>
 #include <cmath>
 #include <SDL.h>
-#include <algorithm>
 
 #define PI 3.14159265358979323846
 
@@ -162,13 +161,24 @@ int main(int argc, char* argv[])
 	float player_a = 1.523;
 	const float fov = PI / 3.0;
 
+	const size_t nColors = 10;
+	std::vector<uint32_t> colors(nColors);
+	for (size_t i = 0; i < nColors; i++)
+	{
+		colors[i] = pack_color(rand() % 255, rand() % 255, rand() % 255);
+	}
+
 	const size_t rect_w = win_w / (map_w * 2);
 	const size_t rect_h = win_h / map_h;
 
-	
+	float last_frame = SDL_GetTicks();
 
 	while(running)
 	{
+		float delta_time = (SDL_GetTicks() - last_frame) / 1000.0;
+
+		last_frame = SDL_GetTicks();
+
 		input();
 
 		for (size_t j = 0; j < map_h; j++)
@@ -183,7 +193,10 @@ int main(int argc, char* argv[])
 				size_t rect_x = i * rect_w;
 				size_t rect_y = j * rect_h;
 
-				draw_rectangle(framebuffer, win_w, win_h, rect_x, rect_y, rect_w, rect_h, pack_color(100, 100, 100));
+				size_t iColor = map[i + j * map_w] - '0';
+				assert(iColor < nColors);
+
+				draw_rectangle(framebuffer, win_w, win_h, rect_x, rect_y, rect_w, rect_h, colors[iColor]);
 			}
 		}
 
@@ -191,7 +204,7 @@ int main(int argc, char* argv[])
 		{
 			float angle = player_a - fov / 2 + fov * i / float(win_w / 2);
 
-			for (float t = 0; t < 20; t += 0.05)
+			for (float t = 0; t < 20; t += 0.01)
 			{
 				float cx = player_x + t * cos(angle);
 				float cy = player_y + t * sin(angle);
@@ -203,8 +216,11 @@ int main(int argc, char* argv[])
 
 				if (map[int(cx) + int(cy) * map_w] != ' ')
 				{
+					size_t iColor = map[int(cx) + int(cy) * map_w] - '0';
+					assert(iColor < nColors);
+
 					size_t column_height = win_h / t;
-					draw_rectangle(framebuffer, win_w, win_h, win_w / 2 + i, win_h / 2 - column_height / 2, 1, column_height, pack_color(100, 100, 100));
+					draw_rectangle(framebuffer, win_w, win_h, win_w / 2 + i, win_h / 2 - column_height / 2, 1, column_height, colors[iColor]);
 					break;
 				}
 			}
