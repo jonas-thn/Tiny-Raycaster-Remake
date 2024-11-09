@@ -69,9 +69,17 @@ void input()
 
 void render()
 {
+	SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+	SDL_RenderClear(renderer);
+
 	SDL_UpdateTexture(screen_texture, NULL, &framebuffer[0], (int)(win_w * sizeof(uint32_t)));
 	SDL_RenderCopy(renderer, screen_texture, NULL, NULL);
 	SDL_RenderPresent(renderer);
+
+	for (size_t i = 0; i < win_w * win_h; i++)
+	{
+		framebuffer[i] = 0xFFFFFFFF;
+	}
 }
 
 void destroy()
@@ -181,6 +189,8 @@ int main(int argc, char* argv[])
 
 		input();
 
+		player_a += delta_time;
+
 		for (size_t j = 0; j < map_h; j++)
 		{
 			for (size_t i = 0; i < map_w; i++)
@@ -219,7 +229,7 @@ int main(int argc, char* argv[])
 					size_t iColor = map[int(cx) + int(cy) * map_w] - '0';
 					assert(iColor < nColors);
 
-					size_t column_height = win_h / t;
+					size_t column_height = win_h / (t * cos(angle - player_a));
 					draw_rectangle(framebuffer, win_w, win_h, win_w / 2 + i, win_h / 2 - column_height / 2, 1, column_height, colors[iColor]);
 					break;
 				}
