@@ -4,7 +4,11 @@
 #include <cstdint>
 #include <cassert>
 #include <cmath>
+#include <string>
 #include <SDL.h>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 #define PI 3.14159265358979323846
 
@@ -15,7 +19,6 @@ const size_t win_h = 512;
 SDL_Renderer* renderer = NULL;
 bool running = false;
 
-//uint32_t* framebuffer = NULL;
 std::vector<uint32_t> framebuffer(win_w* win_h, 0xFFFFFFFF);
 SDL_Texture* screen_texture = NULL;
 
@@ -118,6 +121,55 @@ void drop_ppm_image(const std::string filename, const std::vector<uint32_t>& ima
 	ofs.close();
 }
 
+bool load_texture(const std::string filename, std::vector<uint32_t>& texture, size_t& tex_size, size_t& tex_count)
+{
+	int n_channels = -1, w, h;
+
+	unsigned char* pixmap = stbi_load(filename.c_str(), &w, &h, &n_channels, 0);
+
+	if (!pixmap)
+	{
+		fprintf(stderr, "Error loading textures\n");
+		return false;
+	}
+
+	if (4 != n_channels)
+	{
+		fprintf(stderr, "TExture doesnt have 4 channels\n");
+		stbi_image_free(pixmap);
+		return false;
+	}
+
+	tex_count = w / h;
+	tex_size = w / tex_count;
+
+	if (w != (h * (int)tex_count))
+	{
+		fprintf(stderr, "Texture parts are not square\n");
+		stbi_image_free(pixmap);
+		return false;
+	}
+
+	texture = std::vector<uint32_t>(w * h);
+
+	for (int j = 0; j < h; j++)
+	{
+		for (int i = 0; i < w; i++)
+		{
+			uint8_t r = pixmap[(i + j * w) * 4 + 0];
+			uint8_t g = pixmap[(i + j * w) * 4 + 1];
+			uint8_t b = pixmap[(i + j * w) * 4 + 2];
+			uint8_t a = pixmap[(i + j * w) * 4 + 3];
+
+			texture[i + j * w] = pack_color(r, g, b, a);
+		}
+	}
+
+	stbi_image_free(pixmap);
+
+	return true;
+}
+
 void draw_rectangle(std::vector<uint32_t>& img, const size_t img_w, const size_t img_h, const size_t x, const size_t y, const size_t w, const size_t h, const uint32_t color)
 {
 	assert(img.size() == img_w * img_h);
@@ -174,6 +226,16 @@ int main(int argc, char* argv[])
 	for (size_t i = 0; i < nColors; i++)
 	{
 		colors[i] = pack_color(rand() % 255, rand() % 255, rand() % 255);
+	}
+
+	std::vector<uint32_t> walltex;
+	size_t walltex_size;
+	size_t walltex_count;
+
+	if (!load_texture("./walltext.png", walltex, walltex_size, walltex_count))
+	{
+		fprintf(stderr, "Failed to load wall textures\n");
+		return -1;
 	}
 
 	const size_t rect_w = win_w / (map_w * 2);
@@ -233,6 +295,16 @@ int main(int argc, char* argv[])
 					draw_rectangle(framebuffer, win_w, win_h, win_w / 2 + i, win_h / 2 - column_height / 2, 1, column_height, colors[iColor]);
 					break;
 				}
+			}
+		}
+
+		const size_t tex_id = 4;
+
+		for (size_t i = 0; i < walltex_size; i++)
+		{
+			for (size_t j = 0; j < walltex_size; j++)
+			{
+				framebuffer[i + j * win_w] = walltex[i + tex_id * walltex_size + j * walltex_count * walltex_size];
 			}
 		}
 
