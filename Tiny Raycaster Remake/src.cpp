@@ -17,7 +17,13 @@ const size_t win_w = 1024;
 const size_t win_h = 512;
 
 SDL_Renderer* renderer = NULL;
+
 bool running = false;
+
+bool forward = false;
+bool left = false;
+bool right = false;
+float walk_speed = 2.0f;
 
 std::vector<uint32_t> framebuffer(win_w* win_h, 0xFFFFFFFF);
 SDL_Texture* screen_texture = NULL;
@@ -56,6 +62,8 @@ void input()
 	SDL_Event event;
 	SDL_PollEvent(&event);
 
+	bool mouse_moved = false;
+
 	switch (event.type)
 	{
 	case SDL_QUIT:
@@ -65,6 +73,32 @@ void input()
 		if (event.key.keysym.sym == SDLK_ESCAPE)
 		{
 			running = false;
+		}
+		if (event.key.keysym.sym == SDLK_w)
+		{
+			forward = true;
+		}
+		if (event.key.keysym.sym == SDLK_LEFT)
+		{
+			left = true;
+		}
+		if (event.key.keysym.sym == SDLK_RIGHT)
+		{
+			right = true;
+		}
+		break;
+	case SDL_KEYUP:
+		if (event.key.keysym.sym == SDLK_w)
+		{
+			forward = false;
+		}
+		if (event.key.keysym.sym == SDLK_LEFT)
+		{
+			left = false;
+		}
+		if (event.key.keysym.sym == SDLK_RIGHT)
+		{
+			right = false;
 		}
 		break;
 	}
@@ -272,7 +306,10 @@ int main(int argc, char* argv[])
 
 		input();
 
-		player_a += delta_time;
+		player_a += right ? (delta_time) : 0.0f;
+		player_a -= left ? (delta_time) : 0.0f;
+		player_x += forward ? delta_time * walk_speed * cos(player_a) : 0.0f;
+		player_y += forward ? delta_time * walk_speed * sin(player_a) : 0.0f;
 
 		//draw map
 		for (size_t j = 0; j < map_h; j++)
