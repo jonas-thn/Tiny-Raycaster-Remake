@@ -170,6 +170,27 @@ bool load_texture(const std::string filename, std::vector<uint32_t>& texture, si
 	return true;
 }
 
+std::vector<uint32_t> texture_column(const std::vector<uint32_t>& img, const size_t tex_size, const size_t n_textures, 
+									const size_t tex_id, const size_t tex_coord, const size_t column_height)
+{
+	const size_t img_w = tex_size * n_textures;
+	const size_t img_h = tex_size;
+
+	assert(img.size() == img_w * img_h && tex_coord < tex_size && tex_id < n_textures);
+
+	std::vector<uint32_t> column(column_height);
+
+	for (size_t y = 0; y < column_height; y++)
+	{
+		size_t pix_x = tex_id * tex_size + tex_coord;
+		size_t pix_y = (y * tex_size) / column_height;
+
+		column[y] = img[pix_x + pix_y * img_w];
+	}
+
+	return column;
+}
+
 void draw_rectangle(std::vector<uint32_t>& img, const size_t img_w, const size_t img_h, const size_t x, const size_t y, const size_t w, const size_t h, const uint32_t color)
 {
 	assert(img.size() == img_w * img_h);
@@ -204,9 +225,9 @@ int main(int argc, char* argv[])
 		"0     0  1110000"\
 		"0     3        0"\
 		"0   10000      0"\
-		"0   0   11100  0"\
-		"0   0   0      0"\
-		"0   0   1  00000"\
+		"0   3   11100  0"\
+		"5   4   0      0"\
+		"5   4   1  00000"\
 		"0       1      0"\
 		"2       1      0"\
 		"0       0      0"\
@@ -253,6 +274,7 @@ int main(int argc, char* argv[])
 
 		player_a += delta_time;
 
+		//draw map
 		for (size_t j = 0; j < map_h; j++)
 		{
 			for (size_t i = 0; i < map_w; i++)
@@ -265,13 +287,14 @@ int main(int argc, char* argv[])
 				size_t rect_x = i * rect_w;
 				size_t rect_y = j * rect_h;
 
-				size_t iColor = map[i + j * map_w] - '0';
-				assert(iColor < nColors);
+				size_t tex_id = map[i + j * map_w] - '0';
+				assert(tex_id < walltex_count);
 
-				draw_rectangle(framebuffer, win_w, win_h, rect_x, rect_y, rect_w, rect_h, colors[iColor]);
+				draw_rectangle(framebuffer, win_w, win_h, rect_x, rect_y, rect_w, rect_h, walltex[tex_id * walltex_size]);
 			}
 		}
 
+		//draw 3d
 		for (size_t i = 0; i < win_w / 2; i++)
 		{
 			float angle = player_a - fov / 2 + fov * i / float(win_w / 2);
@@ -281,24 +304,48 @@ int main(int argc, char* argv[])
 				float cx = player_x + t * cos(angle);
 				float cy = player_y + t * sin(angle);
 
-				size_t pix_x = cx * rect_w;
-				size_t pix_y = cy * rect_h;
+				int pix_x = cx * rect_w;
+				int pix_y = cy * rect_h;
 
 				framebuffer[pix_x + pix_y * win_w] = pack_color(160, 160, 160);
 
 				if (map[int(cx) + int(cy) * map_w] != ' ')
 				{
-					size_t iColor = map[int(cx) + int(cy) * map_w] - '0';
-					assert(iColor < nColors);
+					size_t tex_id = map[int(cx) + int(cy) * map_w] - '0';
+					assert(tex_id < walltex_count);
 
 					size_t column_height = win_h / (t * cos(angle - player_a));
-					draw_rectangle(framebuffer, win_w, win_h, win_w / 2 + i, win_h / 2 - column_height / 2, 1, column_height, colors[iColor]);
+
+					float hitx = cx - floor(cx + .5); 
+					float hity = cy - floor(cy + .5); 
+
+					int x_texcoord = hitx * walltex_size;
+					if (std::abs(hity) > std::abs(hitx)) //check if horizontal or vertical wall
+					{ 
+						x_texcoord = hity * walltex_size;
+					}
+
+					if (x_texcoord < 0) x_texcoord += walltex_size; 
+
+					assert(x_texcoord >= 0 && x_texcoord < (int)walltex_size);
+
+					std::vector<uint32_t> column = texture_column(walltex, walltex_size, walltex_count, tex_id, x_texcoord, column_height);
+					
+					pix_x = win_w / 2 + i;
+
+					for (size_t j = 0; j < column_height; j++) 
+					{
+						pix_y = j + win_h / 2 - column_height / 2;
+						if (pix_y < 0 || pix_y >= (int)win_h) continue;
+						framebuffer[pix_x + pix_y * win_w] = column[j];
+					}
+
 					break;
 				}
 			}
 		}
 
-		const size_t tex_id = 4;
+		/*const size_t tex_id = 4;
 
 		for (size_t i = 0; i < walltex_size; i++)
 		{
@@ -306,7 +353,7 @@ int main(int argc, char* argv[])
 			{
 				framebuffer[i + j * win_w] = walltex[i + tex_id * walltex_size + j * walltex_count * walltex_size];
 			}
-		}
+		}*/
 
 		render();
 	}
